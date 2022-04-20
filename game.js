@@ -1,98 +1,137 @@
-const question = document.querySelector('#question');
-const choices = document.querySelector('.choice-text');
-const progressText = document.querySelector('#progressText');
-const scoreText = document.querySelector('#score');
-const progressBarFull = document.querySelector('#progressBarfull');
+// variables
+const question = document.getElementById('question');
+const choices = Array.from(document.getElementsByClassName('choice-text'));
+const progressText = document.getElementById('progressText');
+const scoreText = document.getElementById('score');
+const progressBarFull =document.getElementById('progressBarFull');
+const loader = document.getElementById('loader');
+const game = document.getElementById('game')
 
+//decalarations
+let currentQuestion = {};
+let acceptingAnswers = false;
+let score = 0;
+let questionCounter = 0;
+let availableQuestions = [];
 
-let currentQuestion = {}
-let acceptingAnswers = true
-let score = 0
-let questionCounter = 0
-let availableQuestions = []
+let questions = [];
 
-let questions = [
-    {
-    question: "Inside which HTML element do we put the JavaScript??",
-    choice1: "<script>",
-    choice2: "<javascript>",
-    choice3: "<js>",
-    choice4: "<scripting>",
-    answer: 1
-},
-{
-    question: "What is the correct syntax for referring to an extranal script called 'zzz.js'?",
-    choice1: "<script href='zzz.js'>",
-    choice2: "<script name='zzz.js'>",
-    choice3: "<script src= 'zzz.js'>",
-    choice4: "<script file= 'zzz.js'>",
-    answer: 2
-},
-{
-    question: "how do you write 'hello world' in an alert box?",
-    choice1: "msgbox('hello world');",
-    choice2: "alerBox('hello world'>;",
-    choice3: "msg('hello world');>",
-    choice4: "alert('hello world';",
-    answer: 3
-}
-]
-const SCORE_POINTS = 100
-const MAX_QUESTIONS = 4
+fetch('https://opentdb.com/api.php?amount=10&category=9&difficulty=easy&type=multiple')
+.then(res => {
+  return res.json();
+})
+.then(loadedQuestions => {
+  console.log(loadedQuestions.results);
+  questions = loadedQuestions.results.map(loadedQuestion => {
+    const formattedQuestion = {
+      question: loadedQuestion.question
+    };
+    const answerchoices = [...loadedQuestion.incorrect_answers];
+    formattedQuestion.answer = Math.floor(Math.random() * 3) +1;
+    answerchoices.splice(formattedQuestion.answer -1, 0, loadedQuestion.corrrect_answer);
+
+    answerchoices.forEach((choice,index) => {
+      formattedQuestion["choice" + (index + 1)] = choice;
+    });
+    return formattedQuestion;
+  });
+
+  startGame();
+})
+
+.catch(error => {
+  console.log(error);
+});
+
+//CONSTANTS
+const CORRECT_BONUS = 10;
+const MAX_QUESTIONS = 3;
+
+// StartGame function
 startGame = () => {
-    questionCounter = 0
-    score = 0
-    availableQuestions = [...questions]
-    getNewQuestion()
-}
+    questionCounter = 0;
+    score = 0;
+    availableQuestions = [...questions];
+    console.log(availableQuestions);
+    getNewQuestion();
+    game.classList.remove("hidden");
+    loader.classList.add("hidden");
+};
+
 getNewQuestion = () => {
-    if(availableQuestions.length === 0 || questionCounter > MAX_QUESTIONS) {
-        localStorage.setIem('mostRecentscore', score)
 
-        return window.location.assign('/end.html')
+  //goto end page when questions are empty
+    if ( availableQuestions.length === 0 || questionCounter >= MAX_QUESTIONS) {
+      localStorage.setItem('mostRecentScore', score);
+        //go to the end page when finishing all questions
+        return window.location.assign('/end.html');
     }
-questionCounter++
-progressText.innerText = 'Question ${questionCounter} of ${MAX_QUESTIONS'
-progressBarFull.style.width = '${(questionCounter/MAX_QUESTIONS) * 100}%'
 
-const questionsIndex = Math.floor(Math.randon() * availableQuestions.length)
-currentQuestion = availableQuestions [questionsIndex]
-question.innerText = currentQuestion.question
+    //incrementing the counter
+    questionCounter++;
+    progressText.innerText = `Question ${questionCounter} / ${MAX_QUESTIONS}`;
 
-choices.forEach(choice => {
-    const number = choice.dataset [ 'number']
-    choice.innerText = currentQuestion ['choice' + number]
-})
-
-availableQuestions.splice(questionsIndex, 1)
-acceptingAnswers = true
-}
-choices.forEach(choice => {
-    choice.addEventListener('click', e => {
-    if(!acceptingAnswers) return
-
-    acceptingAnswers = false
-    const selectedChoice = e.target 
-    const selectedAnswer = selectedChoice.dataset['number']
-
-let classToApply = selectedAnswer == currentQuestion.answer ? 'correct' :
-'incorrect'
-
-if(classToApply === 'correct') {
-    incrementScore(SCORE_POINTS)
-}
-selectedChoice.parentElement.classList.add(classToApply)
+    //update the progressbar
+    progressBarFull.style.width = `${(questionCounter / MAX_QUESTIONS) *100}%`;
 
 
-setTimeout(() => {
-    selectedChoice.parentElement.classList.remove(classToApply)
-getNewQuestion()
-        }, 1000)
-    })
-})
+    //get random question using random operator and convert it into integer
+    const questionIndex = Math.floor(Math.random() * availableQuestions.length);
 
-icrementScore = num => {
-    score +=num
-    scoreText.innerText = score
-}
-startGame()
+    //reference to current question
+    currentQuestion = availableQuestions[questionIndex];
+    question.innerText = currentQuestion.question;
+
+    //now we need to replace the choices with new choices 
+    choices.forEach( (choice) => {
+        //get a reference to the choice data number 
+        const number = choice.dataset['number'];
+        choice.innerText = currentQuestion['choice' + number]
+    });
+
+    //remove the answered question
+    availableQuestions.splice(questionIndex, 1);
+    console.log(availableQuestions);
+    acceptingAnswers = true;
+};
+
+choices.forEach( choice => {
+    choice.addEventListener('click' , e => {
+        console.log(e.target);
+        if(!acceptingAnswers) return;
+
+        acceptingAnswers = false;
+        const selectedChoice = e.target;
+        const selectedAnswer = selectedChoice.dataset['number'];
+        //check if selected answer is correct
+        console.log(selectedAnswer == currentQuestion.answer);
+
+        const classToApply = selectedAnswer == currentQuestion.answer ? 'correct' : 'incorrect';
+        console.log(classToApply)
+       //Updating score 
+
+       if (classToApply === 'correct'){
+         incrementScore(CORRECT_BONUS);
+       }
+
+        //add style in javascript
+        selectedChoice.parentElement.classList.add(classToApply);
+
+        
+        //set a timer to wait 
+        setTimeout( () => {
+            selectedChoice.parentElement.classList.remove(classToApply);
+            //after selecting answer you want new question so call the function
+        getNewQuestion();
+
+        }, 1000);
+        
+    });
+});
+
+incrementScore = bonus => {
+  score += bonus;
+  scoreText.innerText = score;
+};
+
+
